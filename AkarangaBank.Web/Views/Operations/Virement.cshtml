@@ -8,6 +8,7 @@
         <a asp-action="Journal" class="bank-btn bank-btn-light">Voir le journal</a>
     </header>
     <div class="bank-page-body">
+        <div class="bank-flash-warning">Tout virement entre deux agences est enregistré en attente et doit être approuvé par un administrateur avant d’être comptabilisé.</div>
         @if (TempData["Success"] is string msg) { <div class="bank-flash" role="status">@msg</div> }
         <form asp-action="Virement" method="post" class="bank-form">
             <div asp-validation-summary="ModelOnly" class="bank-validation"></div>

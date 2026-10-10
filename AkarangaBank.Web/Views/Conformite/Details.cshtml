@@ -3,7 +3,7 @@
 <partial name="_OperationsStyles" />
 
 <section class="bank-page">
-    <header class="bank-page-header"><div><h1>Détail de l'alerte</h1><p>@Model.TypeAlerte — @Model.DateAlerte.ToString("dd/MM/yyyy HH:mm")</p></div></header>
+    <header class="bank-page-header"><div><h1>Détail de l'alerte</h1><p>@Model.TypeAlerte — @BankTime.ToLocal(Model.DateAlerte).ToString("dd/MM/yyyy HH:mm")</p></div></header>
     <div class="bank-page-body">
         @if (TempData["Success"] is string msg) { <div class="bank-flash" role="status">@msg</div> }
         <dl class="bank-details">

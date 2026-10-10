@@ -9,7 +9,7 @@
 <section class="bank-page">
     <header class="bank-page-header"><div><h1>Opération @Model.Reference</h1><p>@Model.TypeOperation · @Model.Statut</p></div><a asp-action="Journal" class="bank-btn bank-btn-light">Retour au journal</a></header>
     <div class="bank-page-body">
-        <dl class="bank-details"><dt>Date</dt><dd>@Model.DateOperation.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</dd><dt>Compte</dt><dd>@Model.Compte.NumeroCompte · @Model.Compte.Client.Nom @Model.Compte.Client.Prenom</dd><dt>Montant</dt><dd>@Model.Montant.ToString("N2") @Model.Devise</dd><dt>Statut</dt><dd>@Model.Statut</dd></dl>
+        <dl class="bank-details"><dt>Date</dt><dd>@BankTime.ToLocal(Model.DateOperation).ToString("dd/MM/yyyy HH:mm")</dd><dt>Compte</dt><dd>@Model.Compte.NumeroCompte · @Model.Compte.Client.Nom @Model.Compte.Client.Prenom</dd><dt>Montant</dt><dd>@Model.Montant.ToString("N2") @Model.Devise</dd><dt>Statut</dt><dd>@Model.Statut</dd></dl>
         <h2 class="bank-section-title">Écritures comptables (@Model.Ecritures.Count)</h2>
         <div class="bank-table-wrap"><table class="bank-table"><thead><tr><th>Sens</th><th>Compte</th><th>Compte général</th><th>Libellé</th><th class="text-end">Montant</th></tr></thead><tbody>
         @foreach (var ecriture in Model.Ecritures.OrderBy(e => e.Id))

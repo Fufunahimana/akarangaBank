@@ -8,7 +8,7 @@ internal static class AmlCsvExport
 {
     private static readonly string[] Headers =
     [
-        "Id alerte", "Date UTC", "Numero client", "Nom du client", "Type", "Niveau", "Statut",
+        "Id alerte", "Date (Africa/Bujumbura)", "Numero client", "Nom du client", "Type", "Niveau", "Statut",
         "Reference operation", "Description"
     ];
 
@@ -21,7 +21,7 @@ internal static class AmlCsvExport
         {
             csv.AppendLine(Row(
                 alert.Id.ToString(CultureInfo.InvariantCulture),
-                alert.DateAlerte.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture),
+                BankTime.ToLocal(alert.DateAlerte).ToString("O", CultureInfo.InvariantCulture),
                 alert.Client?.NumeroClient,
                 $"{alert.Client?.Nom} {alert.Client?.Prenom}".Trim(),
                 alert.TypeAlerte,

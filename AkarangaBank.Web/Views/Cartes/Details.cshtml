@@ -53,7 +53,7 @@
                 <tbody>
                 @foreach (var transaction in Model.Transactions)
                 {
-                    <tr><td>@transaction.DateTransaction.ToString("dd/MM/yyyy HH:mm")</td><td>@transaction.TypeTransaction</td><td>@transaction.Montant.ToString("N2") BIF</td><td>@transaction.Statut</td><td>@transaction.MotifRefus</td><td>@transaction.Operation?.Reference</td></tr>
+                    <tr><td>@BankTime.ToLocal(transaction.DateTransaction).ToString("dd/MM/yyyy HH:mm")</td><td>@transaction.TypeTransaction</td><td>@transaction.Montant.ToString("N2") BIF</td><td>@transaction.Statut</td><td>@transaction.MotifRefus</td><td>@transaction.Operation?.Reference</td></tr>
                 }
                 @if (Model.Transactions.Count == 0) { <tr><td colspan="6" class="bank-empty">Aucune transaction enregistrée pour cette carte.</td></tr> }
                 </tbody>

@@ -140,7 +140,9 @@ if (!app.Environment.IsDevelopment())
 // Redirection automatique de la racine vers la page de connexion Identity
 app.MapGet("/", async context =>
 {
-    context.Response.Redirect("/Identity/Account/Login");
+    context.Response.Redirect(context.User.Identity?.IsAuthenticated == true
+        ? (context.User.IsInRole("admin") ? "/Home/Index" : "/Clients/Index")
+        : "/Identity/Account/Login");
     await Task.CompletedTask;
 });
 // Créez un scope pour accéder aux services de l'application

@@ -23,7 +23,7 @@ public class CompensationsController : Controller
 
     public async Task<IActionResult> Index(int? agenceId, DateTime? date)
     {
-        var jour = (date ?? DateTime.UtcNow).Date;
+        var jour = (date ?? BankTime.Today).Date;
         ViewBag.Agences = new SelectList(await _context.Agences.AsNoTracking().OrderBy(a => a.Code).ToListAsync(), "Id", "Code", agenceId);
         ViewBag.AgenceId = agenceId;
         ViewBag.Date = jour;

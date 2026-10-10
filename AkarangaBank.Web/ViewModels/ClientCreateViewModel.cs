@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations; 
+using AkarangaBank.Web.Services;
  
 namespace AkarangaBank.Web.ViewModels; 
  
@@ -23,7 +24,7 @@ public class ClientCreateViewModel
     [DataType(DataType.Date)] 
     [Display(Name = "Date de naissance")] 
     public DateTime DateNaissance { get; set; } = 
-DateTime.Today.AddYears(-18); 
+BankTime.Today.AddYears(-18); 
  
     [Required(ErrorMessage = "Le numéro de CNI est obligatoire.")] 
     [StringLength(30)] 

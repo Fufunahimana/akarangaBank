@@ -118,7 +118,7 @@
                             <tr>
                                 <td>@verification.TypeDocument</td>
                                 <td>@verification.Statut</td>
-                                <td>@(verification.DateVerification?.ToLocalTime().ToString("dd/MM/yyyy") ?? "—")</td>
+                                <td>@(verification.DateVerification.HasValue ? BankTime.ToLocal(verification.DateVerification.Value).ToString("dd/MM/yyyy") : "—")</td>
                                 <td>@(verification.VerifiePar?.NomComplet ?? "—")</td>
                             </tr>
                         }

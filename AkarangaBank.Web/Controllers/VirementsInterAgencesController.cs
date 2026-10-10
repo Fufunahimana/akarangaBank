@@ -27,7 +27,7 @@ public class VirementsInterAgencesController : Controller
 
     public async Task<IActionResult> Index()
     {
-        var agenceId = await GetAgenceIdAsync();
+        var agenceId = await GetAgenceFiltrageAsync();
         return View(await _service.GetEnAttenteAsync(agenceId));
     }
 
@@ -48,15 +48,20 @@ public class VirementsInterAgencesController : Controller
             return View(vm);
         }
 
-        var agenceUtilisateur = await GetAgenceIdAsync();
-        if (agenceUtilisateur.HasValue)
+        if (!User.IsInRole("admin"))
         {
+            var agenceUtilisateur = await GetAgenceIdAsync();
             var agenceSource = await _context.Comptes.AsNoTracking()
                 .Where(c => c.Id == vm.CompteSourceId)
                 .Select(c => (int?)c.AgenceId)
                 .FirstOrDefaultAsync();
-            if (agenceSource != agenceUtilisateur)
-                return Forbid();
+            if (!agenceUtilisateur.HasValue || agenceSource != agenceUtilisateur)
+            {
+                ModelState.AddModelError(string.Empty,
+                    "Vous ne pouvez initier un virement qu'à partir d'un compte de votre agence.");
+                await ChargerComptesAsync(vm.CompteSourceId, vm.CompteDestinationId);
+                return View(vm);
+            }
         }
 
         try
@@ -102,7 +107,7 @@ public class VirementsInterAgencesController : Controller
 
     public async Task<IActionResult> Historique(DateTime? du, DateTime? au)
     {
-        var virements = await _service.GetHistoriqueAsync(await GetAgenceIdAsync(), du, au);
+        var virements = await _service.GetHistoriqueAsync(await GetAgenceFiltrageAsync(), du, au);
         ViewBag.Du = du;
         ViewBag.Au = au;
         return View(virements);
@@ -117,6 +122,15 @@ public class VirementsInterAgencesController : Controller
             .FirstOrDefaultAsync();
     }
 
+    private async Task<int?> GetAgenceFiltrageAsync()
+    {
+        if (User.IsInRole("admin"))
+            return null;
+
+        // null means unrestricted access in the service and is reserved for admins.
+        return await GetAgenceIdAsync() ?? int.MinValue;
+    }
+
     private async Task ChargerComptesAsync(int? sourceId = null, int? destinationId = null)
     {
         var agenceUtilisateur = await GetAgenceIdAsync();
@@ -129,9 +143,9 @@ public class VirementsInterAgencesController : Controller
             .OrderBy(c => c.NumeroCompte)
             .Select(c => new { c.Id, c.AgenceId, Libelle = $"{c.NumeroCompte} — {c.Client.Nom} {c.Client.Prenom} ({c.Agence.Code})" })
             .ToListAsync();
-        var comptesSource = agenceUtilisateur.HasValue
-            ? comptes.Where(c => c.AgenceId == agenceUtilisateur.Value)
-            : comptes;
+        var comptesSource = comptes.Where(c =>
+            User.IsInRole("admin")
+            || (agenceUtilisateur.HasValue && c.AgenceId == agenceUtilisateur.Value));
         ViewBag.ComptesSource = new SelectList(comptesSource, "Id", "Libelle", sourceId);
         ViewBag.ComptesDestination = new SelectList(comptes, "Id", "Libelle", destinationId);
     }

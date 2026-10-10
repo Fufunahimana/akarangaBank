@@ -50,7 +50,7 @@
                     @foreach (var op in Model.Operations)
                     {
                         <tr>
-                            <td>@op.DateOperation.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@BankTime.ToLocal(op.DateOperation).ToString("dd/MM/yyyy HH:mm")</td>
                             <td><strong>@op.Reference</strong></td>
                             <td>@(op.TypeOperation == "Depot" ? "Dépôt" : op.TypeOperation)</td>
                             <td>@op.Compte.NumeroCompte</td>

@@ -130,6 +130,7 @@ public class CarteService : ICarteService
         var carte = await _context.Cartes.Include(c => c.Compte).FirstOrDefaultAsync(c => c.Id == carteId)
             ?? throw new InvalidOperationException("Carte introuvable.");
         var now = maintenant ?? DateTime.UtcNow;
+        var nowLocal = BankTime.ToLocal(now);
         var typeValide = CanonicaliserTypeTransaction(typeTransaction);
         var type = typeValide ?? (string.IsNullOrWhiteSpace(typeTransaction)
             ? "Invalide"
@@ -140,7 +141,7 @@ public class CarteService : ICarteService
             motifRefus = "Le montant doit être supérieur à zéro.";
         else if (motifRefus is null && carte.Statut != "Active")
             motifRefus = $"Carte {carte.Statut}. Transaction refusée.";
-        else if (motifRefus is null && carte.DateExpiration.Date < now.Date)
+        else if (motifRefus is null && carte.DateExpiration.Date < nowLocal.Date)
             motifRefus = "Carte expirée.";
         else if (motifRefus is null && carte.Compte.Statut != "Actif")
             motifRefus = "Le compte associé est inactif.";
@@ -149,8 +150,7 @@ public class CarteService : ICarteService
 
         if (motifRefus is null)
         {
-            var debutJournee = now.Date;
-            var finJournee = debutJournee.AddDays(1);
+            var (debutJournee, finJournee) = BankTime.GetUtcDayRange(nowLocal);
             if (type == "Retrait")
             {
                 var utilise = await GetUtilisationJournaliereAsync(carte.Id, debutJournee, finJournee, "Retrait");
@@ -204,7 +204,7 @@ public class CarteService : ICarteService
         {
             var operation = new Operation
             {
-                Reference = $"CB-{now:yyyyMMdd}-{RandomNumberGenerator.GetHexString(6)}",
+                Reference = $"CB-{nowLocal:yyyyMMdd}-{RandomNumberGenerator.GetHexString(6)}",
                 TypeOperation = $"Carte{type}",
                 CompteId = carte.CompteId,
                 UtilisateurId = utilisateurId,

@@ -2,6 +2,7 @@ using AkarangaBank.Web.Data;
 using AkarangaBank.Web.Models;
 using AkarangaBank.Web.ViewModels;
 using Microsoft.EntityFrameworkCore;
+using System.Text.Json;
 
 namespace AkarangaBank.Web.Services;
 
@@ -37,39 +38,27 @@ public class ComptabiliteService : IComptabiliteService
         if (analyse.EstBloquee)
             throw new InvalidOperationException(analyse.Motif ?? "Opération bloquée par le contrôle de conformité.");
 
+        var approbationAdminRequise = RequiertApprobationAdmin(analyse);
         await using var transaction = await _context.Database.BeginTransactionAsync();
         var transactionCommitted = false;
         try
         {
             var operation = CreerOperation(compte, utilisateurId, "Depot", vm.Montant, vm.Commentaire);
+            if (approbationAdminRequise)
+            {
+                operation.Statut = "EnAttente";
+                operation.DateValidation = null;
+            }
             _context.Operations.Add(operation);
             await _context.SaveChangesAsync();
 
-            _context.Ecritures.AddRange(new Ecriture
+            if (!approbationAdminRequise)
             {
-                OperationId = operation.Id,
-                CompteId = compte.Id,
-                CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
-                Sens = "Credit",
-                Montant = vm.Montant,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Dépôt sur compte {compte.NumeroCompte}"
-            }, new Ecriture
-            {
-                OperationId = operation.Id,
-                CompteId = null,
-                CodeCompteGeneral = $"CAISSE:{compte.AgenceId}",
-                Sens = "Debit",
-                Montant = vm.Montant,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Contrepartie de caisse du dépôt {operation.Reference}"
-            });
-
-            compte.Solde += vm.Montant;
-            compte.DateModification = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+                AjouterEcrituresDepot(operation, compte);
+                compte.Solde += vm.Montant;
+                compte.DateModification = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
             await transaction.CommitAsync();
             transactionCommitted = true;
 
@@ -96,60 +85,33 @@ public class ComptabiliteService : IComptabiliteService
         if (analyse.EstBloquee)
             throw new InvalidOperationException(analyse.Motif ?? "Opération bloquée par le contrôle de conformité.");
 
+        var approbationAdminRequise = RequiertApprobationAdmin(analyse);
         await using var transaction = await _context.Database.BeginTransactionAsync();
         var transactionCommitted = false;
         try
         {
             var operation = CreerOperation(compte, utilisateurId, "Retrait", vm.Montant, vm.Commentaire);
-            var operationFrais = CreerOperation(compte, utilisateurId, "Frais", frais, "Frais de retrait (1 %, minimum 100 BIF)");
-            _context.Operations.AddRange(operation, operationFrais);
+            Operation? operationFrais = null;
+            if (approbationAdminRequise)
+            {
+                operation.Statut = "EnAttente";
+                operation.DateValidation = null;
+            }
+            _context.Operations.Add(operation);
+            if (!approbationAdminRequise)
+            {
+                operationFrais = CreerOperation(compte, utilisateurId, "Frais", frais, "Frais de retrait (1 %, minimum 100 BIF)");
+                _context.Operations.Add(operationFrais);
+            }
             await _context.SaveChangesAsync();
 
-            _context.Ecritures.AddRange(new Ecriture
+            if (!approbationAdminRequise)
             {
-                OperationId = operation.Id,
-                CompteId = compte.Id,
-                CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
-                Sens = "Debit",
-                Montant = vm.Montant,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Retrait du compte {compte.NumeroCompte}"
-            }, new Ecriture
-            {
-                OperationId = operationFrais.Id,
-                CompteId = compte.Id,
-                CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
-                Sens = "Debit",
-                Montant = frais,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Frais de retrait du compte {compte.NumeroCompte}"
-            }, new Ecriture
-            {
-                OperationId = operation.Id,
-                CompteId = null,
-                CodeCompteGeneral = $"CAISSE:{compte.AgenceId}",
-                Sens = "Credit",
-                Montant = vm.Montant,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Contrepartie de caisse du retrait {operation.Reference}"
-            }, new Ecriture
-            {
-                OperationId = operationFrais.Id,
-                CompteId = null,
-                CodeCompteGeneral = $"PRODUITS_FRAIS:{compte.AgenceId}",
-                Sens = "Credit",
-                Montant = frais,
-                Devise = compte.Devise,
-                DateEcriture = DateTime.UtcNow,
-                Libelle = $"Contrepartie de produit des frais {operationFrais.Reference}"
-            });
-
-            compte.Solde -= vm.Montant + frais;
-            compte.DateModification = DateTime.UtcNow;
-            await _context.SaveChangesAsync();
+                AjouterEcrituresRetrait(operation, operationFrais!, compte);
+                compte.Solde -= vm.Montant + frais;
+                compte.DateModification = DateTime.UtcNow;
+                await _context.SaveChangesAsync();
+            }
             await transaction.CommitAsync();
             transactionCommitted = true;
 
@@ -165,6 +127,191 @@ public class ComptabiliteService : IComptabiliteService
         }
     }
 
+    private async Task<Operation?> PrendreOperationAmlEnAttenteAsync(int operationId)
+    {
+        var enAttente = _context.Operations
+            .Where(o => o.Id == operationId && o.Statut == "EnAttente"
+                && (o.TypeOperation == "Depot" || o.TypeOperation == "Retrait"));
+
+        if (_context.Database.IsRelational())
+        {
+            var reservees = await enAttente.ExecuteUpdateAsync(
+                setters => setters.SetProperty(o => o.Statut, "Traitement"));
+            if (reservees == 0)
+                return null;
+        }
+
+        var operation = await _context.Operations
+            .Include(o => o.Compte)
+            .FirstOrDefaultAsync(o => o.Id == operationId
+                && (o.TypeOperation == "Depot" || o.TypeOperation == "Retrait"));
+        if (operation is null || (operation.Statut != "EnAttente" && operation.Statut != "Traitement"))
+            return null;
+
+        operation.Statut = "Traitement";
+        return operation;
+    }
+
+    private void AjouterEcrituresDepot(Operation operation, Compte compte)
+    {
+        var maintenant = DateTime.UtcNow;
+        _context.Ecritures.AddRange(new Ecriture
+        {
+            OperationId = operation.Id,
+            CompteId = compte.Id,
+            CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
+            Sens = "Credit",
+            Montant = operation.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Dépôt sur compte {compte.NumeroCompte}"
+        }, new Ecriture
+        {
+            OperationId = operation.Id,
+            CompteId = null,
+            CodeCompteGeneral = $"CAISSE:{compte.AgenceId}",
+            Sens = "Debit",
+            Montant = operation.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Contrepartie de caisse du dépôt {operation.Reference}"
+        });
+    }
+
+    private void AjouterEcrituresRetrait(Operation operation, Operation operationFrais, Compte compte)
+    {
+        var maintenant = DateTime.UtcNow;
+        _context.Ecritures.AddRange(new Ecriture
+        {
+            OperationId = operation.Id,
+            CompteId = compte.Id,
+            CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
+            Sens = "Debit",
+            Montant = operation.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Retrait du compte {compte.NumeroCompte}"
+        }, new Ecriture
+        {
+            OperationId = operationFrais.Id,
+            CompteId = compte.Id,
+            CodeCompteGeneral = $"CLIENT:{compte.NumeroCompte}",
+            Sens = "Debit",
+            Montant = operationFrais.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Frais de retrait du compte {compte.NumeroCompte}"
+        }, new Ecriture
+        {
+            OperationId = operation.Id,
+            CompteId = null,
+            CodeCompteGeneral = $"CAISSE:{compte.AgenceId}",
+            Sens = "Credit",
+            Montant = operation.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Contrepartie de caisse du retrait {operation.Reference}"
+        }, new Ecriture
+        {
+            OperationId = operationFrais.Id,
+            CompteId = null,
+            CodeCompteGeneral = $"PRODUITS_FRAIS:{compte.AgenceId}",
+            Sens = "Credit",
+            Montant = operationFrais.Montant,
+            Devise = compte.Devise,
+            DateEcriture = maintenant,
+            Libelle = $"Contrepartie de produit des frais {operationFrais.Reference}"
+        });
+    }
+
+    public async Task<IEnumerable<Operation>> GetOperationsAmlEnAttenteAsync() =>
+        await _context.Operations.AsNoTracking()
+            .Include(o => o.Compte).ThenInclude(c => c.Client)
+            .Include(o => o.Utilisateur)
+            .Where(o => o.Statut == "EnAttente" && (o.TypeOperation == "Depot" || o.TypeOperation == "Retrait"))
+            .OrderBy(o => o.DateOperation)
+            .ToListAsync();
+
+    public async Task<bool> ValiderOperationAmlAsync(int operationId, int valideParId)
+    {
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        var operation = await PrendreOperationAmlEnAttenteAsync(operationId);
+        if (operation is null)
+            return false;
+
+        var clientId = operation.Compte.ClientId;
+        try
+        {
+            var compte = operation.Compte;
+            if (compte.Statut != "Actif")
+                throw new InvalidOperationException("Le compte n'est plus actif.");
+
+            if (operation.TypeOperation == "Depot")
+            {
+                AjouterEcrituresDepot(operation, compte);
+                compte.Solde += operation.Montant;
+            }
+            else
+            {
+                var frais = CalculerFraisRetrait(operation.Montant);
+                if (compte.Solde < operation.Montant + frais)
+                    throw new InvalidOperationException("Solde insuffisant au moment de l'approbation du retrait.");
+
+                var operationFrais = CreerOperation(
+                    compte, operation.UtilisateurId, "Frais", frais, "Frais de retrait (1 %, minimum 100 BIF)");
+                _context.Operations.Add(operationFrais);
+                await _context.SaveChangesAsync();
+                AjouterEcrituresRetrait(operation, operationFrais, compte);
+                compte.Solde -= operation.Montant + frais;
+            }
+
+            var maintenant = DateTime.UtcNow;
+            compte.DateModification = maintenant;
+            operation.Statut = "Valide";
+            operation.DateValidation = maintenant;
+            _context.AuditLogs.Add(CreerAuditDecisionAml(operation, valideParId, "ValidationOperationAML", "Valide"));
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+
+        await CreerAlertesAvanceesAsync(clientId, operation.Id);
+        return true;
+    }
+
+    public async Task<bool> RejeterOperationAmlAsync(int operationId, int valideParId, string motif)
+    {
+        if (string.IsNullOrWhiteSpace(motif))
+            throw new ArgumentException("Le motif du rejet est obligatoire.", nameof(motif));
+
+        await using var transaction = await _context.Database.BeginTransactionAsync();
+        var operation = await PrendreOperationAmlEnAttenteAsync(operationId);
+        if (operation is null)
+            return false;
+
+        try
+        {
+            var maintenant = DateTime.UtcNow;
+            operation.Statut = "Rejete";
+            operation.DateValidation = maintenant;
+            operation.Commentaire = LimiterCommentaire(
+                $"{operation.Commentaire} | Rejet AML : {motif.Trim()}");
+            _context.AuditLogs.Add(CreerAuditDecisionAml(operation, valideParId, "RejetOperationAML", "Rejete"));
+            await _context.SaveChangesAsync();
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<Operation> VirerAsync(VirementViewModel vm, int utilisateurId)
     {
         if (vm.CompteSourceId == vm.CompteDestinationId)
@@ -172,6 +319,8 @@ public class ComptabiliteService : IComptabiliteService
 
         var source = await GetCompteActifAsync(vm.CompteSourceId);
         var destination = await GetCompteActifAsync(vm.CompteDestinationId);
+        if (source.AgenceId != destination.AgenceId)
+            throw new InvalidOperationException("Un virement entre deux agences doit rester en attente et être approuvé par un administrateur.");
         if (source.Devise != destination.Devise)
             throw new InvalidOperationException("Les devises des deux comptes doivent être identiques.");
         if (source.Solde < vm.Montant)
@@ -257,9 +406,15 @@ public class ComptabiliteService : IComptabiliteService
             .AsQueryable();
 
         if (du.HasValue)
-            query = query.Where(o => o.DateOperation >= du.Value.Date);
+        {
+            var (debutUtc, _) = BankTime.GetUtcDayRange(du.Value);
+            query = query.Where(o => o.DateOperation >= debutUtc);
+        }
         if (au.HasValue)
-            query = query.Where(o => o.DateOperation < au.Value.Date.AddDays(1));
+        {
+            var (_, finUtc) = BankTime.GetUtcDayRange(au.Value);
+            query = query.Where(o => o.DateOperation < finUtc);
+        }
         if (!string.IsNullOrWhiteSpace(typeOperation))
             query = query.Where(o => o.TypeOperation == typeOperation);
 
@@ -317,6 +472,7 @@ public class ComptabiliteService : IComptabiliteService
     public async Task<bool> VerifierEquilibreGlobalAsync()
     {
         var operations = await _context.Operations.AsNoTracking()
+            .Where(o => o.Statut == "Valide")
             .Select(o => new
             {
                 o.TypeOperation,
@@ -374,6 +530,26 @@ public class ComptabiliteService : IComptabiliteService
         };
     }
 
+    private static bool RequiertApprobationAdmin(ResultatConformite analyse) =>
+        analyse.NecessiteVigilanceRenforcee || analyse.NecessiteDeclaration;
+
+    private static AuditLog CreerAuditDecisionAml(Operation operation, int adminId, string action, string statut) =>
+        new()
+        {
+            DateEvenement = DateTime.UtcNow,
+            UtilisateurId = adminId,
+            AgenceId = operation.AgenceId,
+            Action = action,
+            TableConcernee = "Operations",
+            EnregistrementId = operation.Id,
+            ValeurAvant = "EnAttente",
+            ValeurApres = statut,
+            Details = $"Décision admin sur l'opération AML {operation.Reference}."
+        };
+
+    private static string? LimiterCommentaire(string commentaire) =>
+        commentaire.Length <= 255 ? commentaire : commentaire[..255];
+
     private async Task CreerAlertesSiNecessaireAsync(
         int clientId, int operationId, ResultatConformite analyse, bool fractionnement, ResultatSurveillance surveillance)
     {
@@ -426,7 +602,7 @@ public class ComptabiliteService : IComptabiliteService
 
     private static string GenererReference(string prefix)
     {
-        var date = DateTime.UtcNow.ToString("yyyyMMdd");
+        var date = BankTime.Today.ToString("yyyyMMdd");
         var random = Guid.NewGuid().ToString("N")[..6].ToUpperInvariant();
         return $"{prefix}-{date}-{random}";
     }

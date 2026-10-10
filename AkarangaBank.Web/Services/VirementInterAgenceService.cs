@@ -245,9 +245,15 @@ public class VirementInterAgenceService : IVirementInterAgenceService
         if (agenceId.HasValue)
             query = query.Where(v => v.AgenceSourceId == agenceId.Value || v.AgenceDestinationId == agenceId.Value);
         if (du.HasValue)
-            query = query.Where(v => v.DateCreation >= du.Value.Date);
+        {
+            var (debutUtc, _) = BankTime.GetUtcDayRange(du.Value);
+            query = query.Where(v => v.DateCreation >= debutUtc);
+        }
         if (au.HasValue)
-            query = query.Where(v => v.DateCreation < au.Value.Date.AddDays(1));
+        {
+            var (_, finUtc) = BankTime.GetUtcDayRange(au.Value);
+            query = query.Where(v => v.DateCreation < finUtc);
+        }
         return await query.OrderByDescending(v => v.DateCreation).ToListAsync();
     }
 
@@ -274,5 +280,5 @@ public class VirementInterAgenceService : IVirementInterAgenceService
     }
 
     private static string GenererReference(string prefix) =>
-        $"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}"[..30].ToUpperInvariant();
+        $"{prefix}-{BankTime.Today:yyyyMMdd}-{Guid.NewGuid():N}"[..30].ToUpperInvariant();
 }

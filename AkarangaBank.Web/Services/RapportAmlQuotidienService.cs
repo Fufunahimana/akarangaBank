@@ -20,7 +20,7 @@ public sealed class RapportAmlQuotidienService : BackgroundService
         _scopeFactory = scopeFactory;
         _environment = environment;
         _logger = logger;
-        _timeZone = GetBurundiTimeZone();
+        _timeZone = BankTime.TimeZone;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -81,15 +81,4 @@ public sealed class RapportAmlQuotidienService : BackgroundService
         return filePath;
     }
 
-    private static TimeZoneInfo GetBurundiTimeZone()
-    {
-        try
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("Africa/Bujumbura");
-        }
-        catch (TimeZoneNotFoundException)
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("South Africa Standard Time");
-        }
-    }
 }

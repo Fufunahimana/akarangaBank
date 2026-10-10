@@ -21,7 +21,7 @@
                     @foreach (var e in Model.Ecritures)
                     {
                         <tr>
-                            <td>@e.DateEcriture.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@BankTime.ToLocal(e.DateEcriture).ToString("dd/MM/yyyy HH:mm")</td>
                             <td>@e.Libelle</td>
                             <td style="text-align:right;color:#dc3545">@(e.Sens == "Debit" ? e.Montant.ToString("N2") : "—")</td>
                             <td style="text-align:right;color:#198754">@(e.Sens == "Credit" ? e.Montant.ToString("N2") : "—")</td>

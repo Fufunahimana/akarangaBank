@@ -164,7 +164,7 @@
             </tr>
             <tr>
                 <th>Date de création</th>
-                <td>@Model.Agence.DateCreation.ToString("dd/MM/yyyy HH:mm")</td>
+                <td>@BankTime.ToLocal(Model.Agence.DateCreation).ToString("dd/MM/yyyy HH:mm")</td>
             </tr>
         </table>
 

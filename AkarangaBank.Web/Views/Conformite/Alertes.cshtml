@@ -42,7 +42,7 @@
                     {
                         var badge = alerte.Niveau == "Critique" ? "bank-badge-danger" : alerte.Niveau == "Eleve" ? "bank-badge-warning" : "bank-badge-info";
                         <tr>
-                            <td>@alerte.DateAlerte.ToString("dd/MM/yyyy HH:mm")</td>
+                            <td>@BankTime.ToLocal(alerte.DateAlerte).ToString("dd/MM/yyyy HH:mm")</td>
                             <td>@alerte.Client.Nom @alerte.Client.Prenom</td>
                             <td>@alerte.TypeAlerte</td>
                             <td><span class="bank-badge @badge">@alerte.Niveau</span></td>

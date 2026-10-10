@@ -42,7 +42,7 @@ public class PretService : IPretService
             : CalculerMensualite(pret.MontantPrincipal, pret.TauxInteret, pret.DureeMois);
         var tauxMensuel = pret.TauxInteret / 1200m;
         var solde = pret.MontantPrincipal;
-        var dateReference = (dateDebut ?? pret.DateDebut ?? DateTime.UtcNow).Date;
+        var dateReference = (dateDebut ?? pret.DateDebut ?? BankTime.Today).Date;
         var echeances = new List<EcheancePret>(pret.DureeMois);
 
         for (var numero = 1; numero <= pret.DureeMois; numero++)
@@ -276,7 +276,7 @@ public class PretService : IPretService
 
     public async Task<int> MettreAJourRetardsAsync(DateTime? maintenant = null)
     {
-        var aujourdHui = (maintenant ?? DateTime.UtcNow).Date;
+        var aujourdHui = (maintenant ?? BankTime.Today).Date;
         var enRetard = await _context.EcheancesPret.Include(e => e.Pret)
             .Where(e => e.Statut != "Payee" && e.DateEcheance < aujourdHui)
             .ToListAsync();
@@ -315,5 +315,5 @@ public class PretService : IPretService
         Libelle = libelle
     };
 
-    private static string GenererReference(string prefix) => $"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{RandomNumberGenerator.GetHexString(6)}";
+    private static string GenererReference(string prefix) => $"{prefix}-{BankTime.Today:yyyyMMdd}-{RandomNumberGenerator.GetHexString(6)}";
 }

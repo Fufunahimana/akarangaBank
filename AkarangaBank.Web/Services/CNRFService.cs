@@ -110,7 +110,7 @@ public class CNRFService : ICNRFService
             .AppendLine("DÉCLARATION D'OPÉRATION SUSPECTE (DOS)")
             .AppendLine("Akaranga Bank — Document confidentiel de conformité")
             .AppendLine($"Référence : {reference ?? GenererReference("DOS")}")
-            .AppendLine($"Date de génération : {DateTime.UtcNow:dd/MM/yyyy HH:mm} UTC")
+            .AppendLine($"Date de génération : {BankTime.ToLocal(DateTime.UtcNow):dd/MM/yyyy HH:mm} (Africa/Bujumbura)")
             .AppendLine()
             .AppendLine("IDENTIFICATION DU CLIENT")
             .AppendLine($"Nom : {alerte.Client.Nom} {alerte.Client.Prenom}")
@@ -125,7 +125,7 @@ public class CNRFService : ICNRFService
             contenu.AppendLine($"Référence : {operation.Reference}")
                 .AppendLine($"Type : {operation.TypeOperation}")
                 .AppendLine($"Montant : {operation.Montant:N2} {operation.Devise}")
-                .AppendLine($"Date : {operation.DateOperation:dd/MM/yyyy HH:mm} UTC");
+                .AppendLine($"Date : {BankTime.ToLocal(operation.DateOperation):dd/MM/yyyy HH:mm} (Africa/Bujumbura)");
         }
         else
         {
@@ -145,5 +145,5 @@ public class CNRFService : ICNRFService
     }
 
     private static string GenererReference(string prefix) =>
-        $"{prefix}-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid():N}"[..30].ToUpperInvariant();
+        $"{prefix}-{BankTime.Today:yyyyMMdd}-{Guid.NewGuid():N}"[..30].ToUpperInvariant();
 }
