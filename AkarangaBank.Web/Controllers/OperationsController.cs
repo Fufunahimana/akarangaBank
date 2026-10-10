@@ -129,19 +129,6 @@ public class OperationsController : Controller
                 && agenceSourceId != agenceDestinationId)
             {
                 var userId = await _currentUser.GetUserIdAsync();
-                var agenceUtilisateur = await _context.Users.AsNoTracking()
-                    .Where(u => u.Id == userId)
-                    .Select(u => u.AgenceId)
-                    .FirstOrDefaultAsync();
-                if (!User.IsInRole("admin")
-                    && (!agenceUtilisateur.HasValue || agenceUtilisateur.Value != agenceSourceId))
-                {
-                    ModelState.AddModelError(string.Empty,
-                        "Vous ne pouvez initier un virement qu'à partir d'un compte de votre agence.");
-                    await ChargerComptesVirementAsync(vm.CompteSourceId, vm.CompteDestinationId);
-                    return View(vm);
-                }
-
                 var transfert = await _virementsInterAgences.InitierAsync(
                     new VirementInterAgenceViewModel
                     {
@@ -279,19 +266,7 @@ public class OperationsController : Controller
             })
             .ToListAsync();
 
-        int? agenceUtilisateurId = null;
-        if (!User.IsInRole("admin"))
-        {
-            var userId = await _currentUser.GetUserIdAsync();
-            agenceUtilisateurId = await _context.Users.AsNoTracking()
-                .Where(u => u.Id == userId)
-                .Select(u => u.AgenceId)
-                .FirstOrDefaultAsync();
-        }
-
-        var comptesSource = comptes.Where(c => User.IsInRole("admin")
-            || (agenceUtilisateurId.HasValue && c.AgenceId == agenceUtilisateurId.Value));
-        ViewBag.Comptes = new SelectList(comptesSource, "Id", "Libelle", sourceId);
+        ViewBag.Comptes = new SelectList(comptes, "Id", "Libelle", sourceId);
         ViewBag.ComptesDestination = new SelectList(comptes, "Id", "Libelle", destinationId);
     }
 }

@@ -223,7 +223,7 @@ public class VirementInterAgenceService : IVirementInterAgenceService
         return true;
     }
 
-    public async Task<IEnumerable<VirementInterAgence>> GetEnAttenteAsync(int? agenceId)
+    public async Task<IEnumerable<VirementInterAgence>> GetEnAttenteAsync(int? agenceId, int? utilisateurId = null)
     {
         var query = _context.VirementsInterAgences
             .Include(v => v.AgenceSource)
@@ -231,11 +231,14 @@ public class VirementInterAgenceService : IVirementInterAgenceService
             .AsNoTracking()
             .Where(v => v.Statut == "EnAttente");
         if (agenceId.HasValue)
-            query = query.Where(v => v.AgenceDestinationId == agenceId.Value || v.AgenceSourceId == agenceId.Value);
+            query = query.Where(v => v.AgenceDestinationId == agenceId.Value
+                || v.AgenceSourceId == agenceId.Value
+                || (utilisateurId.HasValue && v.Virement.UtilisateurId == utilisateurId.Value));
         return await query.OrderByDescending(v => v.DateCreation).ToListAsync();
     }
 
-    public async Task<IEnumerable<VirementInterAgence>> GetHistoriqueAsync(int? agenceId, DateTime? du, DateTime? au)
+    public async Task<IEnumerable<VirementInterAgence>> GetHistoriqueAsync(
+        int? agenceId, int? utilisateurId, DateTime? du, DateTime? au)
     {
         var query = _context.VirementsInterAgences
             .Include(v => v.AgenceSource)
@@ -243,7 +246,9 @@ public class VirementInterAgenceService : IVirementInterAgenceService
             .AsNoTracking()
             .AsQueryable();
         if (agenceId.HasValue)
-            query = query.Where(v => v.AgenceSourceId == agenceId.Value || v.AgenceDestinationId == agenceId.Value);
+            query = query.Where(v => v.AgenceSourceId == agenceId.Value
+                || v.AgenceDestinationId == agenceId.Value
+                || (utilisateurId.HasValue && v.Virement.UtilisateurId == utilisateurId.Value));
         if (du.HasValue)
         {
             var (debutUtc, _) = BankTime.GetUtcDayRange(du.Value);

@@ -28,7 +28,8 @@ public class VirementsInterAgencesController : Controller
     public async Task<IActionResult> Index()
     {
         var agenceId = await GetAgenceFiltrageAsync();
-        return View(await _service.GetEnAttenteAsync(agenceId));
+        int? utilisateurId = User.IsInRole("admin") ? null : await _currentUser.GetUserIdAsync();
+        return View(await _service.GetEnAttenteAsync(agenceId, utilisateurId));
     }
 
     [HttpGet]
@@ -46,22 +47,6 @@ public class VirementsInterAgencesController : Controller
         {
             await ChargerComptesAsync(vm.CompteSourceId, vm.CompteDestinationId);
             return View(vm);
-        }
-
-        if (!User.IsInRole("admin"))
-        {
-            var agenceUtilisateur = await GetAgenceIdAsync();
-            var agenceSource = await _context.Comptes.AsNoTracking()
-                .Where(c => c.Id == vm.CompteSourceId)
-                .Select(c => (int?)c.AgenceId)
-                .FirstOrDefaultAsync();
-            if (!agenceUtilisateur.HasValue || agenceSource != agenceUtilisateur)
-            {
-                ModelState.AddModelError(string.Empty,
-                    "Vous ne pouvez initier un virement qu'à partir d'un compte de votre agence.");
-                await ChargerComptesAsync(vm.CompteSourceId, vm.CompteDestinationId);
-                return View(vm);
-            }
         }
 
         try
@@ -107,7 +92,9 @@ public class VirementsInterAgencesController : Controller
 
     public async Task<IActionResult> Historique(DateTime? du, DateTime? au)
     {
-        var virements = await _service.GetHistoriqueAsync(await GetAgenceFiltrageAsync(), du, au);
+        int? utilisateurId = User.IsInRole("admin") ? null : await _currentUser.GetUserIdAsync();
+        var virements = await _service.GetHistoriqueAsync(
+            await GetAgenceFiltrageAsync(), utilisateurId, du, au);
         ViewBag.Du = du;
         ViewBag.Au = au;
         return View(virements);
@@ -133,7 +120,6 @@ public class VirementsInterAgencesController : Controller
 
     private async Task ChargerComptesAsync(int? sourceId = null, int? destinationId = null)
     {
-        var agenceUtilisateur = await GetAgenceIdAsync();
         var query = _context.Comptes.AsNoTracking()
             .Include(c => c.Client)
             .Include(c => c.Agence)
@@ -143,10 +129,7 @@ public class VirementsInterAgencesController : Controller
             .OrderBy(c => c.NumeroCompte)
             .Select(c => new { c.Id, c.AgenceId, Libelle = $"{c.NumeroCompte} — {c.Client.Nom} {c.Client.Prenom} ({c.Agence.Code})" })
             .ToListAsync();
-        var comptesSource = comptes.Where(c =>
-            User.IsInRole("admin")
-            || (agenceUtilisateur.HasValue && c.AgenceId == agenceUtilisateur.Value));
-        ViewBag.ComptesSource = new SelectList(comptesSource, "Id", "Libelle", sourceId);
+        ViewBag.ComptesSource = new SelectList(comptes, "Id", "Libelle", sourceId);
         ViewBag.ComptesDestination = new SelectList(comptes, "Id", "Libelle", destinationId);
     }
 }
