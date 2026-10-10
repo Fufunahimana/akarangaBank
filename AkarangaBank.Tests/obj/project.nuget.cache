@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "J4B9FDfQYfs=",
+  "dgSpecHash": "Tkmqw0xqrO0=",
   "success": true,
-  "projectFilePath": "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
+  "projectFilePath": "D:\\csharptest\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\Nahi\\.nuget\\packages\\humanizer\\2.14.1\\humanizer.2.14.1.nupkg.sha512",
     "C:\\Users\\Nahi\\.nuget\\packages\\humanizer.core\\2.14.1\\humanizer.core.2.14.1.nupkg.sha512",

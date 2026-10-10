@@ -7510,11 +7510,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
+      "projectUniqueName": "D:\\csharptest\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
       "projectName": "AkarangaBank.Tests",
-      "projectPath": "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
+      "projectPath": "D:\\csharptest\\akarangaBank\\AkarangaBank.Tests\\AkarangaBank.Tests.csproj",
       "packagesPath": "C:\\Users\\Nahi\\.nuget\\packages\\",
-      "outputPath": "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Tests\\obj\\",
+      "outputPath": "D:\\csharptest\\akarangaBank\\AkarangaBank.Tests\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -7536,8 +7536,8 @@
           "framework": "net9.0",
           "targetAlias": "net9.0",
           "projectReferences": {
-            "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Web\\AkarangaBank.Web.csproj": {
-              "projectPath": "D:\\aspdotnet\\akarangaBank\\AkarangaBank.Web\\AkarangaBank.Web.csproj"
+            "D:\\csharptest\\akarangaBank\\AkarangaBank.Web\\AkarangaBank.Web.csproj": {
+              "projectPath": "D:\\csharptest\\akarangaBank\\AkarangaBank.Web\\AkarangaBank.Web.csproj"
             }
           }
         }

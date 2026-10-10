@@ -160,12 +160,65 @@ public class ChapterEManualOperationTests
         var alerte = await context.AlertesAML.SingleAsync(a => a.OperationId == operation.Id);
         Assert.Equal("DepassementSeuil", alerte.TypeAlerte);
         Assert.Equal("Moyen", alerte.Niveau);
+        Assert.Equal("EnAttente", operation.Statut);
+        Assert.Empty(await context.Ecritures.Where(e => e.OperationId == operation.Id).ToListAsync());
+        Assert.Single(await comptabilite.GetOperationsAmlEnAttenteAsync(), item => item.Id == operation.Id);
+        Assert.Equal(0m, (await context.Comptes.FindAsync(compte.Id))!.Solde);
         Assert.Contains(await context.AuditLogs.ToListAsync(), audit =>
             audit.Action == "Creation" && audit.TableConcernee == "AlertesAML" && audit.EnregistrementId == alerte.Id);
 
         var affichageAlertes = await new DeclarationService(context, new HttpContextAccessor())
             .GetAlertesAsync(null, "Moyen");
         Assert.Contains(affichageAlertes, item => item.Id == alerte.Id && item.TypeAlerte == "DepassementSeuil");
+
+        Assert.True(await comptabilite.ValiderOperationAmlAsync(operation.Id, utilisateur.Id));
+        Assert.Equal("Valide", (await context.Operations.FindAsync(operation.Id))!.Statut);
+        Assert.Equal(6_000_000m, (await context.Comptes.FindAsync(compte.Id))!.Solde);
+        Assert.Equal(2, await context.Ecritures.CountAsync(e => e.OperationId == operation.Id));
+        Assert.Contains(await context.AuditLogs.ToListAsync(), audit =>
+            audit.Action == "ValidationOperationAML" && audit.EnregistrementId == operation.Id);
+        Assert.False(await comptabilite.ValiderOperationAmlAsync(operation.Id, utilisateur.Id));
+    }
+
+    [Fact]
+    public async Task RetraitAuDessusDuSeuil_NEstDebiteQuApresApprobationAdmin()
+    {
+        await using var context = TestDbContextFactory.CreateInMemoryContext();
+        var (_, _, utilisateur, compte) = await CreerCompteAsync(context, "BJM-0001-0001", 10_000_000m);
+        var comptabilite = CreerComptabilite(context);
+
+        var operation = await comptabilite.RetirerAsync(
+            new RetraitViewModel { CompteId = compte.Id, Montant = 6_000_000m }, utilisateur.Id);
+
+        Assert.Equal("EnAttente", operation.Statut);
+        Assert.Equal(10_000_000m, (await context.Comptes.FindAsync(compte.Id))!.Solde);
+        Assert.Empty(await context.Ecritures.ToListAsync());
+        Assert.DoesNotContain(await context.Operations.ToListAsync(), o => o.TypeOperation == "Frais");
+
+        Assert.True(await comptabilite.ValiderOperationAmlAsync(operation.Id, utilisateur.Id));
+
+        Assert.Equal(3_940_000m, (await context.Comptes.FindAsync(compte.Id))!.Solde);
+        Assert.Equal(2, await context.Ecritures.CountAsync(e => e.OperationId == operation.Id));
+        var operationFrais = await context.Operations.SingleAsync(o => o.TypeOperation == "Frais");
+        Assert.Equal(60_000m, operationFrais.Montant);
+        Assert.Equal(2, await context.Ecritures.CountAsync(e => e.OperationId == operationFrais.Id));
+    }
+
+    [Fact]
+    public async Task RejeterOperationAml_NEnregistreAucuneEcritureEtConserveLeSolde()
+    {
+        await using var context = TestDbContextFactory.CreateInMemoryContext();
+        var (_, _, utilisateur, compte) = await CreerCompteAsync(context, "BJM-0001-0001", 10_000_000m);
+        var comptabilite = CreerComptabilite(context);
+        var operation = await comptabilite.DeposerAsync(
+            new DepotViewModel { CompteId = compte.Id, Montant = 6_000_000m }, utilisateur.Id);
+
+        Assert.True(await comptabilite.RejeterOperationAmlAsync(operation.Id, utilisateur.Id, "Origine des fonds non justifiée"));
+
+        Assert.Equal("Rejete", (await context.Operations.FindAsync(operation.Id))!.Statut);
+        Assert.Equal(10_000_000m, (await context.Comptes.FindAsync(compte.Id))!.Solde);
+        Assert.Empty(await context.Ecritures.ToListAsync());
+        Assert.False(await comptabilite.ValiderOperationAmlAsync(operation.Id, utilisateur.Id));
     }
 
     [Fact]

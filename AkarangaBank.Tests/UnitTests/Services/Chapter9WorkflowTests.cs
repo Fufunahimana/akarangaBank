@@ -1,10 +1,13 @@
 using AkarangaBank.Tests.UnitTests.Helpers;
+using AkarangaBank.Web.Controllers;
 using AkarangaBank.Web.Data;
 using AkarangaBank.Web.Models;
 using AkarangaBank.Web.Services;
 using AkarangaBank.Web.ViewModels;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 using Xunit;
 
 namespace AkarangaBank.Tests.UnitTests.Services;
@@ -48,6 +51,10 @@ public class Chapter9WorkflowTests
         }, user.Id);
 
         Assert.Equal("EnAttente", transfert.Statut);
+        Assert.Single(await service.GetEnAttenteAsync(null), item => item.Id == transfert.Id);
+        Assert.Equal(100_000m, (await context.Comptes.FindAsync(source.Id))!.Solde);
+        Assert.Equal(50_000m, (await context.Comptes.FindAsync(destination.Id))!.Solde);
+        Assert.Empty(await context.Ecritures.ToListAsync());
         Assert.True(await service.ValiderAsync(transfert.Id, user.Id));
 
         var operation = await context.Operations.SingleAsync();
@@ -63,6 +70,45 @@ public class Chapter9WorkflowTests
         Assert.Equal(30_000m, compensationDestination.TotalDebits);
         Assert.Equal(0m, compensationDestination.TotalCredits);
         Assert.True(await compensationService.VerifierEquilibreCompensationsAsync(DateTime.UtcNow));
+    }
+
+    [Fact]
+    public async Task FileInterAgence_AdminVoitLesDemandesDeToutesLesAgences()
+    {
+        await using var context = TestDbContextFactory.CreateInMemoryContext();
+        var agenceSource = await TestDbContextFactory.CreerAgenceAsync(context, "AKR-BJM");
+        var agenceDestination = await TestDbContextFactory.CreerAgenceAsync(context, "AKR-GIT");
+        var clientSource = await TestDbContextFactory.CreerClientAsync(context, agenceSource.Id, "CLI-001");
+        var clientDestination = await TestDbContextFactory.CreerClientAsync(context, agenceDestination.Id, "CLI-002");
+        var user = await TestDbContextFactory.CreerUtilisateurAsync(context, agenceSource.Id);
+        var source = await TestDbContextFactory.CreerCompteAsync(context, clientSource.Id, agenceSource.Id, "BJM-0001-0001", 100_000m);
+        var destination = await TestDbContextFactory.CreerCompteAsync(context, clientDestination.Id, agenceDestination.Id, "GIT-0001-0001", 50_000m);
+        var service = new VirementInterAgenceService(
+            context,
+            new BasicConformiteService(),
+            new EmptyDetectionService(),
+            new DeclarationService(context, new HttpContextAccessor()));
+        var transfert = await service.InitierAsync(new VirementInterAgenceViewModel
+        {
+            CompteSourceId = source.Id,
+            CompteDestinationId = destination.Id,
+            Montant = 30_000m
+        }, user.Id);
+        var controller = new VirementsInterAgencesController(service, null!, context)
+        {
+            ControllerContext = new ControllerContext
+            {
+                HttpContext = new DefaultHttpContext
+                {
+                    User = new ClaimsPrincipal(new ClaimsIdentity(
+                        [new Claim(ClaimTypes.Role, "admin")], "test"))
+                }
+            }
+        };
+
+        var result = Assert.IsType<ViewResult>(await controller.Index());
+        var model = Assert.IsAssignableFrom<IEnumerable<VirementInterAgence>>(result.Model);
+        Assert.Contains(model, item => item.Id == transfert.Id);
     }
 
     [Fact]
