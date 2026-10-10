@@ -44,3 +44,8 @@ Pour lancer ce projet en local, suivez les étapes ci-dessous :
 
 ---
 *Université Polytechnique de Gitega (UPG) — Faculté TIC — Génie Logiciel Bac III (2025-2026)*
+
+![Page de connexion](imgs/loginPage.JPG)
+![Tableau de bord admin](imgs/tableauxbordadmin.JPG)
+![Paramètres](imgs/parametrs.JPG)
+![Virement en cours](imgs/virement%20encours%20d'approbation.JPG)
