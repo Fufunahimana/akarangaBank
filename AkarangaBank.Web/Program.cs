@@ -10,6 +10,9 @@ var builder = WebApplication.CreateBuilder(args);
  
 // --- Base de données (MariaDB / MySqlConnector) --- 
 var connectionString = builder.Configuration.GetConnectionString("AkarangaBank");
+if (string.IsNullOrWhiteSpace(connectionString))
+    throw new InvalidOperationException("La chaîne de connexion 'AkarangaBank' est absente. Configurez ConnectionStrings__AkarangaBank dans Railway.");
+
 builder.Services.AddTransient<Microsoft.AspNetCore.Identity.UI.Services.IEmailSender, EmailSender>();
 builder.Services.AddDbContext<AkarangaBankContext>(options => 
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))); 
@@ -125,9 +128,11 @@ builder.Services.AddRazorPages(options =>
  
 var app = builder.Build(); 
  
-// --- Initialisation (rôles + admin) --- 
+// --- Initialisation de la base (migrations, rôles + admin) --- 
 using (var scope = app.Services.CreateScope()) 
 { 
+    var dbContext = scope.ServiceProvider.GetRequiredService<AkarangaBankContext>();
+    await dbContext.Database.MigrateAsync();
     await AdminInitializer.InitializeAsync(scope.ServiceProvider); 
 } 
  
