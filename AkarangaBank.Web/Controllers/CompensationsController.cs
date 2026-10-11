@@ -28,7 +28,13 @@ public class CompensationsController : Controller
         ViewBag.AgenceId = agenceId;
         ViewBag.Date = jour;
         ViewBag.Equilibree = await _service.VerifierEquilibreCompensationsAsync(jour);
-        return View(await _service.GetCompensationsAsync(agenceId, date));
+        var toutesLesCompensations = await _service.GetCompensationsAsync(null, jour);
+        ViewBag.TotalDebitsJour = toutesLesCompensations.Sum(c => c.TotalDebits);
+        ViewBag.TotalCreditsJour = toutesLesCompensations.Sum(c => c.TotalCredits);
+        var compensationsAffichees = agenceId.HasValue
+            ? toutesLesCompensations.Where(c => c.AgenceId == agenceId.Value)
+            : toutesLesCompensations;
+        return View(compensationsAffichees);
     }
 
     [HttpPost]

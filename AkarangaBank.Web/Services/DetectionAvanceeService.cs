@@ -21,6 +21,7 @@ public class DetectionAvanceeService : IDetectionAvanceeService
         var operations = await _context.Operations.AsNoTracking()
             .Where(o => o.DateOperation >= date.AddDays(-30) && o.DateOperation <= date)
             .Where(o => o.Compte.ClientId == clientId && o.TypeOperation == "Depot")
+            .Where(o => o.Statut == "Valide")
             .Where(o => o.Montant >= seuil * 0.8m && o.Montant < seuil)
             .ToListAsync();
 
@@ -45,6 +46,7 @@ public class DetectionAvanceeService : IDetectionAvanceeService
         var comptesAvecDepots = await _context.Operations.AsNoTracking()
             .Where(o => o.DateOperation >= debut && o.DateOperation <= date)
             .Where(o => o.Compte.ClientId == clientId && o.TypeOperation == "Depot")
+            .Where(o => o.Statut == "Valide")
             .Where(o => o.Montant > 0 && o.Montant < seuil)
             .GroupBy(o => o.CompteId)
             .Select(group => new { CompteId = group.Key, Total = group.Sum(o => o.Montant) })

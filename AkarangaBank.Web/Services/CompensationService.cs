@@ -17,9 +17,18 @@ public class CompensationService : ICompensationService
             throw new InvalidOperationException($"Agence {agenceId} introuvable.");
 
         var debut = date.Date;
-        var fin = debut.AddDays(1);
+        var (debutUtc, finUtc) = BankTime.GetUtcDayRange(debut);
+
+        // A settled daily batch must remain immutable. Recalculating it could
+        // reset a settled status and allow the same net position to be paid twice.
+        var compensationReglee = await _context.CompensationsAgences
+            .AnyAsync(c => c.DateCompensation >= debut && c.DateCompensation < debut.AddDays(1)
+                && c.Statut == "Regle");
+        if (compensationReglee)
+            throw new InvalidOperationException("La compensation de cette journée est déjà réglée et ne peut plus être recalculée.");
+
         var virements = await _context.VirementsInterAgences.AsNoTracking()
-            .Where(v => v.DateCompensation >= debut && v.DateCompensation < fin && v.Statut == "EnCompensation")
+            .Where(v => v.DateCompensation >= debutUtc && v.DateCompensation < finUtc && v.Statut == "EnCompensation")
             .ToListAsync();
 
         // Create or refresh both sides of the settlement batch, so the daily
@@ -28,6 +37,7 @@ public class CompensationService : ICompensationService
             .Append(agenceId)
             .Distinct()
             .ToArray();
+        var fin = debut.AddDays(1);
         var resultatAgence = default(CompensationAgence);
 
         foreach (var id in agences)
@@ -163,9 +173,17 @@ public class CompensationService : ICompensationService
     {
         var debut = date.Date;
         var fin = debut.AddDays(1);
+        var (debutUtc, finUtc) = BankTime.GetUtcDayRange(debut);
+        var existeVirementACompense = await _context.VirementsInterAgences.AsNoTracking()
+            .AnyAsync(v => v.DateCompensation >= debutUtc && v.DateCompensation < finUtc
+                && v.Statut == "EnCompensation");
+        if (!existeVirementACompense)
+            return false;
+
         var compensations = await _context.CompensationsAgences.AsNoTracking()
             .Where(c => c.DateCompensation >= debut && c.DateCompensation < fin)
             .ToListAsync();
-        return compensations.Sum(c => c.TotalDebits) == compensations.Sum(c => c.TotalCredits);
+        return compensations.Count > 0
+            && compensations.Sum(c => c.TotalDebits) == compensations.Sum(c => c.TotalCredits);
     }
 }

@@ -929,3 +929,4 @@ D:\temp\AkarangaBank-validation\bin\Debug\net9.0\AkarangaBank.Web.dll
 D:\temp\AkarangaBank-validation\bin\Debug\net9.0\AkarangaBank.Web.pdb
 D:\csharptest\akarangaBank\AkarangaBank.Web\obj\Debug\net9.0\compressed\v1xbsgcwh6-{0}-5v7l68ugzt-5v7l68ugzt.gz
 D:\csharptest\akarangaBank\AkarangaBank.Web\obj\Debug\net9.0\compressed\3xphuv31r5-{0}-6ewugi52pc-6ewugi52pc.gz
+D:\csharptest\akarangaBank\AkarangaBank.Web\bin\Debug\net9.0\appsettings.Production.json
